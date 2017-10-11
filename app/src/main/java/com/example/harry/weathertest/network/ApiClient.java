@@ -25,8 +25,7 @@ import retrofit2.http.Query;
 public class ApiClient {
 
     private static final String BASE_URL="http://api.openweathermap.org";
-    private static String IMG_URL = "http://openweathermap.org/img/w/";
-
+    public static String IMG_URL = "http://openweathermap.org/img/w/";
     public static final String API_KEY = "";
     private static Retrofit retrofit = null;
     private static boolean shouldRebuild = false;

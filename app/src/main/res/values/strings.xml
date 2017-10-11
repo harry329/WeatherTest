@@ -6,4 +6,11 @@
     <string name="max_min">Max/Min</string>
     <string name="wind">Wind</string>
     <string name="sunset_sunrise">Sunset/Sunrise</string>
+    <string name="text_mentioning_today_s_weather">Text mentioning today\'s weather</string>
+    <string name="search_button_to_find_weather_conditons_of_city_provided_in_text_view">Search Button to find weather conditons of city provided in text view</string>
+    <string name="humidity">Humidity</string>
+    <string name="image_view_for_weather_conditions_icon">Image view for weather conditions icon</string>
+    <string name="description">Description</string>
+    <string name="weather_conditions_loading">Weather conditions loading</string>
+    <string name="data_not_available_yet">Data not available yet</string>
 </resources>

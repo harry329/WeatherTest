@@ -1,11 +1,11 @@
 package com.example.harry.weathertest.activities;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -16,7 +16,12 @@ import android.widget.TextView;
 import com.example.harry.weathertest.R;
 import com.example.harry.weathertest.model.WeatherData;
 import com.example.harry.weathertest.network.ApiClient;
-import com.google.gson.Gson;
+import com.example.harry.weathertest.util.AppConstant;
+import com.example.harry.weathertest.util.PreferenceStorage;
+import com.squareup.picasso.Picasso;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -26,19 +31,29 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
+import static com.example.harry.weathertest.R.id.imageView;
+
 public class MainActivity extends AppCompatActivity {
 
     @BindView(R.id.lytLoading) FrameLayout lytLoading;
     @BindView(R.id.tvLoading) TextView tvLoading;
     @BindView(R.id.vLoading) LoadingView vLoading;
-    @BindView(R.id.cityName) TextView cityName;
+    @BindView(R.id.cityName) TextView cityNameText;
     @BindView(R.id.maxMinText) TextView maxMinText;
     @BindView(R.id.humidityText) TextView humidityText;
     @BindView(R.id.windText) TextView windText;
     @BindView(R.id.sunsetSunriseText) TextView sunsetSunriseText;
     @BindView(R.id.description) TextView description;
-    @BindView(R.id.imageView)
+    @BindView(imageView)
     ImageView displayIcon;
+
+    private String cityName;
+    private String minMax;
+    private String humidity;
+    private String wind;
+    private String sunTimings;
+    private String icon;
+    private String desc;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,21 +62,82 @@ public class MainActivity extends AppCompatActivity {
         ButterKnife.bind(this);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+                if(cityName == null || cityName.isEmpty()) {
+                    return;
+                }
+                Intent intent = new Intent(Intent.ACTION_SEND);
+                intent.setData(Uri.parse("smsto:"));
+                intent.putExtra("sms_body", "Weather for " + cityName + " is " + desc);
+                if (intent.resolveActivity(getPackageManager()) != null) {
+                    startActivity(intent);
+                }
             }
         });
+        Bundle bundle = PreferenceStorage.getValues(this);
+        if(bundle.getBoolean(AppConstant.DATA_PRESENT)) {
+            getLocalData(bundle);
+            showData();
+        }
+    }
+
+    private void initContentDesc() {
+        cityNameText.setContentDescription(cityNameText.getText());
+        maxMinText.setContentDescription(maxMinText.getText());
+        humidityText.setContentDescription(humidityText.getText());
+        windText.setContentDescription(windText.getText());
+        sunsetSunriseText.setContentDescription(sunsetSunriseText.getText());
+        description.setContentDescription(description.getText());
+    }
+
+    private void getLocalData(Bundle bundle) {
+        if(bundle != null) {
+            cityName = bundle.getString(AppConstant.CITY);
+            minMax = bundle.getString(AppConstant.TEMP_MAX);
+            humidity = bundle.getString(AppConstant.HUMIDITY);
+            wind = bundle.getString(AppConstant.SPEED);
+            sunTimings = bundle.getString(AppConstant.SUNRISE);
+            icon = bundle.getString(AppConstant.ICON);
+            desc = bundle.getString(AppConstant.DESCRIPTION);
+        }
+    }
+
+    private void getServerData(WeatherData data) {
+        cityName = cityNameText.getText().toString();
+        minMax = ((int) (data.getMain().get(AppConstant.TEMP_MAX) - 273)) + AppConstant.FARN + AppConstant.SLASH + ((int) (data.getMain().get(AppConstant.TEMP_MIN) - 273)) + AppConstant.FARN;
+        humidity = data.getMain().get(AppConstant.HUMIDITY).toString().concat(AppConstant.PERCENT);
+        wind = data.getWind().get(AppConstant.SPEED).toString().concat(AppConstant.US_UNIT);
+        sunTimings = dateFormat(Math.round((double)data.getSys().get(AppConstant.SUNRISE))) + AppConstant.SLASH + dateFormat(Math.round((double)data.getSys().get(AppConstant.SUNSET)));
+        icon = ApiClient.IMG_URL+data.getWeather().get(0).get(AppConstant.ICON)+".png";
+        desc = data.getWeather().get(0).get(AppConstant.DESCRIPTION).toString();
+    }
+
+    private Bundle saveInfo() {
+        Bundle bundle = new Bundle();
+        bundle.putBoolean(AppConstant.DATA_PRESENT,true);
+        bundle.putString(AppConstant.DESCRIPTION,desc);
+        bundle.putString(AppConstant.ICON,icon);
+        bundle.putString(AppConstant.TEMP_MAX,minMax);
+        bundle.putString(AppConstant.HUMIDITY,humidity);
+        bundle.putString(AppConstant.SPEED,wind);
+        bundle.putString(AppConstant.SUNRISE,sunTimings);
+        bundle.putString(AppConstant.CITY,cityName);
+        return bundle;
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        PreferenceStorage.storeValues(this,saveInfo());
     }
 
     @OnClick(R.id.search)
     public void search() {
-        if(cityName.getText().toString() == null || cityName.getText().toString().trim().equals("")) {
-            cityName.setError("Please put correct city name");
+        if(cityNameText.getText().toString() == null || cityNameText.getText().toString().trim().equals("")) {
+            cityNameText.setError("Please put correct city name");
             return;
         }
         fetchWeatherData();
@@ -72,7 +148,6 @@ public class MainActivity extends AppCompatActivity {
             lytLoading.setVisibility(View.VISIBLE);
             tvLoading.setText("Loading");
             vLoading.start();
-            Log.d("set","sset");
         } else {
             lytLoading.setVisibility(View.GONE);
             vLoading.stop();
@@ -81,37 +156,40 @@ public class MainActivity extends AppCompatActivity {
 
     private void fetchWeatherData() {
         setVisible(true);
-        Call<WeatherData> call =  ApiClient.apiInterface().getWeather(cityName.getText().toString(),ApiClient.API_KEY);
+        Call<WeatherData> call =  ApiClient.apiInterface().getWeather(cityNameText.getText().toString(),ApiClient.API_KEY);
         call.enqueue(new Callback<WeatherData>() {
             @Override
             public void onResponse(Call<WeatherData> call, Response<WeatherData> response) {
                 setVisible(false);
                 if(response.body() != null) {
-                    showData(response.body());
-                    Log.d("response" , " response is "+ new Gson().toJson(response));
+                    getServerData(response.body());
+                    showData();
                 }
             }
 
             @Override
             public void onFailure(Call<WeatherData> call, Throwable t) {
                 setVisible(false);
+                cityNameText.setError("Please put correct city name");
             }
         });
     }
 
-    private void showData(WeatherData data)  {
-        try {
-            //maxMinTkansasext.setText(data.getMain().get("temp_min") + "/" + data.getMain().get("temp_max"));
-            humidityText.setText(data.getMain().toString());
-            Log.d("no exception", "nod " + data.getMain().toString());
-            Log.d("no exception", "nod " + data.getSys().toString());
-            Log.d("no exception", "nod " + data.getWind().toString());
-            Log.d("no exception", "nod " + data.getWeather().get(0));
-            Log.d("no exception", "nod " + data.toString());
-        }catch (Exception e) {
-            Log.d("exception", " ");
-        }
+    private String dateFormat(long time) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("h:mm a");
+        Date date = new Date(time * 1000);
+        return dateFormat.format(date);
+    }
 
+    private void showData()  {
+            humidityText.setText(humidity);
+            maxMinText.setText(minMax);
+            windText.setText(wind);
+            sunsetSunriseText.setText(sunTimings);
+            description.setText(desc);
+            Picasso.with(getBaseContext()).load(icon).into(displayIcon);
+            cityNameText.setText(cityName);
+            initContentDesc();
     }
 
     @Override
